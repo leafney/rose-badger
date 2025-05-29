@@ -3,13 +3,16 @@ package rbadger
 import (
 	"fmt"
 	"log"
+	"testing"
 	"time"
+
+	"github.com/dgraph-io/badger/v4"
 )
 
 // BadgerDBExample 展示了如何使用BadgerDB封装
-func BadgerDBExample() {
+func TestBadgerDBExample(t *testing.T) {
 	// 创建一个新的BadgerDB实例
-	db, err := NewBadgerDB("/tmp/badger")
+	db, err := NewBadgerDB("./badger")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,4 +132,19 @@ func BadgerDBExample() {
 	} else {
 		fmt.Println("垃圾回收完成")
 	}
+	// 注意：RunGC 方法已经处理了 "没有清理任何数据" 的提示性信息，
+	// 如果返回 nil，表示垃圾回收成功或没有需要清理的数据
+}
+
+func TestInMemory(t *testing.T) {
+	opts := badger.DefaultOptions("").WithInMemory(true).WithLogger(nil)
+	opts.WithIndexCacheSize(100 << 20) // 100 MB for index cache
+
+	db, err := NewBadgerDBWithOptions(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	db.SetS("key", "value")
+	t.Log(db.GetS("key"))
 }

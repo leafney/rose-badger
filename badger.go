@@ -576,6 +576,9 @@ func (b *BadgerDB) XDecrBy(key string, decrement int64) (int64, error) {
 }
 
 // RunGC 运行垃圾回收以清理过期的值日志
+// 返回值：
+// - 如果垃圾回收成功或没有需要清理的数据，返回 nil
+// - 如果发生真正的错误，返回相应的错误
 // 示例：
 //
 //	err := db.RunGC(0.5) // 丢弃比例为0.5
@@ -583,5 +586,11 @@ func (b *BadgerDB) XDecrBy(key string, decrement int64) (int64, error) {
 //	    log.Fatal(err)
 //	}
 func (b *BadgerDB) RunGC(discardRatio float64) error {
-	return b.db.RunValueLogGC(discardRatio)
+	err := b.db.RunValueLogGC(discardRatio)
+	// 检查是否是 "没有清理任何数据" 的提示性信息
+	if err != nil && err.Error() == "Value log GC attempt didn't result in any cleanup" {
+		// 这不是真正的错误，而是一个提示性信息，表明当前没有需要清理的数据
+		return nil
+	}
+	return err
 }
