@@ -20,7 +20,7 @@ go get github.com/leafney/rose-badger
 依赖包：
 
 ```bash
-go get github.com/hypermodeinc/badger/v4
+go get github.com/dgraph-io/badger/v4
 ```
 
 ## 使用示例
