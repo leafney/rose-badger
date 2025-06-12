@@ -153,6 +153,28 @@ if err != nil {
 fmt.Printf("新值: %d\n", count)
 ```
 
+### 扫描操作
+
+```go
+// 扫描所有以"user:"为前缀的key
+keys, err := db.FindKeys("user:")
+if err != nil {
+    log.Fatal(err)
+}
+for _, key := range keys {
+    fmt.Printf("找到key: %s\n", key)
+}
+
+// 扫描所有以"cache:"为前缀且未过期的key
+validKeys, err := db.FindXKeys("cache:")
+if err != nil {
+    log.Fatal(err)
+}
+for _, key := range validKeys {
+    fmt.Printf("找到未过期的key: %s\n", key)
+}
+```
+
 ### 垃圾回收
 
 ```go
@@ -198,6 +220,11 @@ if err != nil {
 - `XIncr(key string) (int64, error)` - 将键中存储的数字值加1
 - `XDecr(key string) (int64, error)` - 将键中存储的数字值减1
 - `XDecrBy(key string, decrement int64) (int64, error)` - 将键中存储的数字值减少指定的值
+
+### 扫描操作
+
+- `FindKeys(prefix string) ([]string, error)` - 扫描所有匹配指定前缀的key列表
+- `FindXKeys(prefix string) ([]string, error)` - 扫描所有匹配指定前缀且未过期的key列表
 
 ### 其他操作
 

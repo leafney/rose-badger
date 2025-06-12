@@ -594,3 +594,97 @@ func (b *BadgerDB) RunGC(discardRatio float64) error {
 	}
 	return err
 }
+
+// FindKeys 扫描所有匹配指定前缀的key列表
+// 返回所有匹配前缀的key，包括普通存储和带过期时间存储的key
+// 示例：
+//
+//	keys, err := db.FindKeys("user:")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	for _, key := range keys {
+//	    fmt.Printf("找到key: %s\n", key)
+//	}
+func (b *BadgerDB) FindKeys(prefix string) ([]string, error) {
+	var keys []string
+	err := b.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false // 只需要key，不需要预取值
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		prefixBytes := []byte(prefix)
+		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
+			item := it.Item()
+			key := string(item.Key())
+			keys = append(keys, key)
+		}
+		return nil
+	})
+	return keys, err
+}
+
+// FindXKeys 扫描所有匹配指定前缀且未过期的key列表
+// 只返回带过期时间存储且未过期的key，会自动清理已过期的key
+// 示例：
+//
+//	keys, err := db.FindXKeys("cache:")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	for _, key := range keys {
+//	    fmt.Printf("找到未过期的key: %s\n", key)
+//	}
+func (b *BadgerDB) FindXKeys(prefix string) ([]string, error) {
+	var keys []string
+	var expiredKeys []string
+
+	err := b.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		prefixBytes := []byte(prefix)
+		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
+			item := it.Item()
+			key := string(item.Key())
+
+			// 尝试解析值以检查是否为CacheType且是否过期
+			err := item.Value(func(val []byte) error {
+				var cache CacheType
+				decoder := gob.NewDecoder(bytes.NewReader(val))
+				if err := decoder.Decode(&cache); err != nil {
+					// 如果无法解码为CacheType，跳过此key
+					return nil
+				}
+
+				// 检查是否过期
+				if cache.Expire > 0 && cache.Expire <= time.Now().Unix() {
+					// 已过期，记录待删除
+					expiredKeys = append(expiredKeys, key)
+				} else {
+					// 未过期或永不过期，添加到结果中
+					keys = append(keys, key)
+				}
+				return nil
+			})
+
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 删除已过期的key
+	for _, expiredKey := range expiredKeys {
+		b.Del(expiredKey)
+	}
+
+	return keys, nil
+}
